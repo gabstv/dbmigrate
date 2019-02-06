@@ -25,11 +25,16 @@ var initCmd = &cobra.Command{
 			// get git if available!
 			if groot, err := util.GitRoot(); err == nil {
 				initCmdRoot = groot
+			} else {
+				initCmdRoot, _ = os.Getwd()
 			}
-			initCmdRoot, _ = os.Getwd()
 		}
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) == 1 && args[0] == "debug" {
+			programDebug(cmd)
+			return
+		}
 		if initCmdRoot == "" {
 			cmd.Println("root directory could not be obtainer")
 			os.Exit(1)
@@ -44,4 +49,16 @@ var initCmd = &cobra.Command{
 		}
 		cmd.Println("created:", filepath.Join(initCmdRoot, "dbmigrate.toml"))
 	},
+}
+
+func programDebug(cmd *cobra.Command) {
+	cmd.Println("DEBUG")
+	workingDir, _ := os.Getwd()
+	cmd.Println("workdir:", workingDir)
+	groot, err := util.GitRoot()
+	if err != nil {
+		cmd.Println("git root: ERROR (", err.Error(), ")")
+	} else {
+		cmd.Println("git root:", groot)
+	}
 }
