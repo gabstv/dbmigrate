@@ -1,0 +1,11 @@
+# Configuration for DBMigrate
+
+default_database = "default"
+
+[migrations]
+root = "./migrations"
+default_type = "go"
+
+[[databases]]
+name = "default"
+cs = "./default.db"

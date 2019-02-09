@@ -7,9 +7,16 @@ import (
 )
 
 const tpltoml = `# Configuration for DBMigrate
+
+default_database = "default"
+
 [migrations]
 root = "{{.MigrationsPath}}"
 default_type = "sql"
+
+[[databases]]
+name = "default"
+cs = "./default.db"
 `
 
 const tpljson = `{
