@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 function setup () {
     (cd ../../cmd/dbmigrate && go build && mv ./dbmigrate ../../test/migration/dbmigrate)
 }

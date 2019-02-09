@@ -3,6 +3,7 @@ package dbmigrate
 // Config file of dbmigrate
 type Config struct {
 	DefaultDatabase string     `toml:"default_database"`
+	Driver          string     `toml:"driver"`
 	Migrations      Migrations `toml:"migrations"`
 	Databases       []Database `toml:"databases"`
 }

@@ -16,6 +16,7 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/gabstv/dbmigrate/internal/pkg/util"
@@ -90,6 +91,27 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+		//fmt.Println("Using config file:", viper.ConfigFileUsed())
+	} else {
+		//fmt.Println("not using config!", err.Error())
 	}
+}
+
+func getDBFromConfig(name string) (connectionString string) {
+	if !viper.IsSet(fmt.Sprintf("databases.%v", name)) {
+		return
+	}
+	if v := viper.GetString(fmt.Sprintf("databases.%v.cs", name)); v != "" {
+		connectionString = v
+		return
+	}
+	if v := viper.GetString(fmt.Sprintf("databases.%v.file", name)); v != "" {
+		if ff, err := ioutil.ReadFile(v); err != nil {
+			fmt.Println("Could not read", v, "->", err.Error())
+		} else {
+			connectionString = string(ff)
+			return
+		}
+	}
+	return
 }

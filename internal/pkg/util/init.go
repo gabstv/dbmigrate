@@ -9,6 +9,7 @@ import (
 const tpltoml = `# Configuration for DBMigrate
 
 default_database = "default"
+driver = "sqlite3"
 
 [migrations]
 root = "{{.MigrationsPath}}"
