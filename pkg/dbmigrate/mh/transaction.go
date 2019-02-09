@@ -8,7 +8,7 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type ExitTx interface {
+type Mtx interface {
 	BindNamed(query string, arg interface{}) (string, []interface{})
 	DriverName() string
 	Exec(query string, args ...interface{}) sql.Result

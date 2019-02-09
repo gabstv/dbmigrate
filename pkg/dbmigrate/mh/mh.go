@@ -16,7 +16,7 @@ import (
 var drivers map[string]driver.Driver
 var driversMu sync.RWMutex
 
-func Run(fn func(tx ExitTx)) {
+func Run(fn func(tx Mtx)) {
 	driverName := os.Getenv("DBMSESS__DRIVER_NAME")
 	dataSourceName := os.Getenv("DBMSESS__DATA_SOURCE_NAME")
 	rawdb, err := open(driverName, dataSourceName)
