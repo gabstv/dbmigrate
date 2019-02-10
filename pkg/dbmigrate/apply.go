@@ -3,6 +3,7 @@ package dbmigrate
 import (
 	"bufio"
 	"bytes"
+	"database/sql"
 	"fmt"
 	"io"
 	"os"
@@ -39,6 +40,51 @@ type MigFile struct {
 	// tags tier 2
 	IsNew bool
 	Error string
+}
+
+var existsQuery = map[string]string{
+	"sqlite3": "SELECT 1 FROM sqlite_master WHERE type='table' AND name='db_migrations';",
+	"mysql":   "SELECT 1 FROM db_migrations LIMIT 1;",
+}
+
+func MigrationTableExists() (bool, error) {
+	db, err := mh.EnvConnect()
+	if err != nil {
+		return false, err
+	}
+	defer db.Close()
+	qq := existsQuery[db.DriverName()]
+	if qq == "" {
+		return false, fmt.Errorf("no query for this driver: %v", db.DriverName())
+	}
+	var nn int
+	err = db.QueryRowx(qq).Scan(&nn)
+	if err != nil && err.Error() == sql.ErrNoRows.Error() {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+var createQuery = map[string]string{
+	"sqlite3": "CREATE TABLE `db_migrations` ( `migration_id` TEXT NOT NULL UNIQUE, `author_name` TEXT NOT NULL, `created_at` TIMESTAMP NOT NULL, `applied_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP );",
+	"mysql":   "CREATE TABLE `db_migrations` ( `migration_id` char(36) NOT NULL DEFAULT '', `author_name` varchar(150) NOT NULL DEFAULT '', `created_at` datetime NOT NULL, `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (`migration_id`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
+}
+
+func CreateMigrationTable() error {
+	db, err := mh.EnvConnect()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	qq := createQuery[db.DriverName()]
+	if qq == "" {
+		return fmt.Errorf("no query for this driver: %v", db.DriverName())
+	}
+	_, err = db.Exec(qq)
+	return err
 }
 
 func ListMigrations(rootp string) (newlist, oldlist []*MigFile, err error) {
