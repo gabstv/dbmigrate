@@ -4,16 +4,21 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/manifoldco/promptui"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var applyCmdDBName string
+var applyCmdConfirm bool
+var applyCmdRootPath string
 
 func init() {
 	rootCmd.AddCommand(applyCmd)
 	//
 	applyCmd.Flags().StringVarP(&applyCmdDBName, "database", "d", "", "database to apply the migrations (default specified in the config file)")
+	applyCmd.Flags().BoolVarP(&applyCmdConfirm, "yes", "y", false, "if true, the apply command doesn't wait for confirmation")
 }
 
 var applyCmd = &cobra.Command{
@@ -36,13 +41,36 @@ var applyCmd = &cobra.Command{
 		if dbcs == "" {
 			return fmt.Errorf("no connection string")
 		}
-		os.Setenv("DBMSESS__DATA_SOURCE_NAME", dbcs)
+		if err := os.Setenv("DBMSESS__DATA_SOURCE_NAME", dbcs); err != nil {
+			return errors.Wrap(err, "set env DSN")
+		}
 		os.Unsetenv("DBMSESS__DRIVER_NAME")
 		drvname := viper.GetString("driver")
 		if drvname == "" {
 			return fmt.Errorf("empty driver name")
 		}
-		os.Setenv("DBMSESS__DRIVER_NAME", drvname)
+		if err := os.Setenv("DBMSESS__DRIVER_NAME", drvname); err != nil {
+			return errors.Wrap(err, "set env DSN")
+		}
+
+		rootp := viper.GetString("migrations.root")
+		if rootp == "" && !applyCmdConfirm {
+			fmt.Println("The migrations root path is empty. The current directory will be used:")
+			wdd, _ := os.Getwd()
+			fmt.Println(wdd)
+			prompt := promptui.Prompt{
+				IsConfirm: true,
+				Label:     "Continue",
+			}
+			result, err := prompt.Run()
+			if err != nil {
+				return errors.Wrap(err, "get prompt 1")
+			}
+			if result == "n" {
+				return fmt.Errorf("aborted")
+			}
+		}
+		applyCmdRootPath = rootp
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
