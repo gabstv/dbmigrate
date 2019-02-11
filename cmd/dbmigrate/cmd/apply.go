@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/gabstv/dbmigrate/pkg/dbmigrate"
 
@@ -138,6 +139,13 @@ var applyCmd = &cobra.Command{
 		for _, v := range newmigs {
 			fmt.Println("TODO: mig this", v.Name)
 			// TODO: run migration (go run for go files)
+			if verboseMode {
+				fmt.Println(time.Now().Format("2006-02-01 15:04:05"), "START:", v.Name)
+			}
+			if err := dbmigrate.Apply(v, verboseMode); err != nil {
+				fmt.Println(time.Now().Format("2006-02-01 15:04:05"), "FAILED:", v.Name)
+				fmt.Println(err.Error())
+			}
 		}
 	},
 }

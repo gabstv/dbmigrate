@@ -1,20 +1,22 @@
 package dbmigrate
 
 import (
-	"os/exec"
-	"context"
-	"io/ioutil"
 	"bufio"
 	"bytes"
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/gabstv/dbmigrate/pkg/dbmigrate/mh"
 	"github.com/jmoiron/sqlx"
@@ -142,25 +144,36 @@ func ListMigrations(rootp string) (newlist, oldlist []*MigFile, err error) {
 	return
 }
 
+// Apply a migration.
 func Apply(mf *MigFile, verbose bool) error {
 	if mf.Type == TypeGo {
-		return applyGo(mf)
+		return applyGo(mf, verbose)
 	}
 	if mf.Type == TypeSQL {
-		return applySQL(mf)
+		return applySQL(mf, verbose)
 	}
 	return fmt.Errorf("not configured migration type: %v", mf.Type)
 }
 
-func applyGo(mf *MigFile) error {
+func applyGo(mf *MigFile, verbose bool) error {
 	dirn, filen := filepath.Split(mf.Name)
 	cmdd := exec.Command("go", "run", filen)
 	cmdd.Dir = dirn
 	cmdlog, err := cmdd.CombinedOutput()
-	if
+	if err != nil {
+		if cmdlog != nil && verbose {
+			fmt.Println(string(cmdlog))
+		}
+		return errors.Wrap(err, fmt.Sprintf("Migration failed (%v)", mf.Name))
+	}
+	if verbose && cmdlog != nil && len(cmdlog) > 0 {
+		fmt.Println(fmt.Sprintf("%v:", mf.Name))
+		fmt.Println(string(cmdlog))
+	}
+	return nil
 }
 
-func applySQL(mf *MigFile) error {
+func applySQL(mf *MigFile, verbose bool) error {
 	db, err := mh.EnvConnect()
 	if err != nil {
 		return err
