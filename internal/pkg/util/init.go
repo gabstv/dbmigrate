@@ -14,6 +14,7 @@ driver = "sqlite3"
 [migrations]
 root = "{{.MigrationsPath}}"
 default_type = "sql"
+insert_query = ""
 
 [[databases]]
 name = "default"

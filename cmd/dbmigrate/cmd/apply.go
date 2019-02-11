@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/gabstv/dbmigrate/pkg/dbmigrate"
+
 	"github.com/manifoldco/promptui"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -74,7 +76,68 @@ var applyCmd = &cobra.Command{
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		//viper.Get("default_database")
-		fmt.Println("will compare with db", applyCmdDBName)
+		tableexists, err := dbmigrate.MigrationTableExists()
+		if err != nil {
+			fmt.Println("error while checking if the db_migrations table exists:", err.Error())
+			os.Exit(1)
+		}
+		if !tableexists {
+			if !applyCmdConfirm {
+				fmt.Println("The table db_migrations does not exist and will be created.")
+				prompt := promptui.Prompt{
+					IsConfirm: true,
+					Label:     "Continue",
+				}
+				result, err := prompt.Run()
+				if err != nil {
+					fmt.Println("Error:", err.Error())
+					os.Exit(1)
+				}
+				if result == "n" {
+					os.Exit(2)
+				}
+			}
+			if err := dbmigrate.CreateMigrationTable(); err != nil {
+				fmt.Println("Error:", err.Error())
+				os.Exit(1)
+			}
+		}
+		newmigs, oldmigs, err := dbmigrate.ListMigrations(applyCmdRootPath)
+		if err != nil {
+			fmt.Println("Error:", err.Error())
+			os.Exit(1)
+		}
+		if verboseMode {
+			fmt.Println("Installed Migrations:")
+			for _, v := range oldmigs {
+				fmt.Println(v.Name, v.T.Format("2006-02-01 15:04:05"))
+			}
+		}
+		if len(newmigs) == 0 {
+			fmt.Println("No migrations to apply.")
+			os.Exit(0)
+		}
+		fmt.Printf("%v migrations to apply:\n", len(newmigs))
+		for _, v := range newmigs {
+			fmt.Println(v.Name, v.T.Format("2006-02-01 15:04:05"))
+		}
+		if !applyCmdConfirm {
+			prompt := promptui.Prompt{
+				IsConfirm: true,
+				Label:     "Continue",
+			}
+			result, err := prompt.Run()
+			if err != nil {
+				fmt.Println("Error:", err.Error())
+				os.Exit(1)
+			}
+			if result == "n" {
+				os.Exit(2)
+			}
+		}
+		for _, v := range newmigs {
+			fmt.Println("TODO: mig this", v.Name)
+			// TODO: run migration (go run for go files)
+		}
 	},
 }

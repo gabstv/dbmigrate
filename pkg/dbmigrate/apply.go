@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -29,6 +30,7 @@ var tagExps = map[FileType]*regexp.Regexp{
 	TypeSQL: amtagsql,
 }
 
+// MigFile represents a migration file and associated tags.
 type MigFile struct {
 	Name string
 	Type FileType
@@ -47,6 +49,8 @@ var existsQuery = map[string]string{
 	"mysql":   "SELECT 1 FROM db_migrations LIMIT 1;",
 }
 
+// MigrationTableExists will test if the table that logs the applied
+// migrations exists.
 func MigrationTableExists() (bool, error) {
 	db, err := mh.EnvConnect()
 	if err != nil {
@@ -73,6 +77,7 @@ var createQuery = map[string]string{
 	"mysql":   "CREATE TABLE `db_migrations` ( `migration_id` char(36) NOT NULL DEFAULT '', `author_name` varchar(150) NOT NULL DEFAULT '', `created_at` datetime NOT NULL, `applied_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (`migration_id`) ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;",
 }
 
+// CreateMigrationTable creates the table to log applied migrations.
 func CreateMigrationTable() error {
 	db, err := mh.EnvConnect()
 	if err != nil {
@@ -87,8 +92,9 @@ func CreateMigrationTable() error {
 	return err
 }
 
+// ListMigrations lits the applied and pending migrations.
 func ListMigrations(rootp string) (newlist, oldlist []*MigFile, err error) {
-	onurdered := make([]*MigFile, 0)
+	unordered := make([]*MigFile, 0)
 	filepath.Walk(rootp, func(path string, info os.FileInfo, err error) error {
 		if validExts[filepath.Ext(path)] {
 			var t FileType
@@ -98,7 +104,7 @@ func ListMigrations(rootp string) (newlist, oldlist []*MigFile, err error) {
 			case ".go":
 				t = TypeGo
 			}
-			onurdered = append(onurdered, &MigFile{
+			unordered = append(unordered, &MigFile{
 				Name: path,
 				Type: t,
 			})
@@ -110,11 +116,26 @@ func ListMigrations(rootp string) (newlist, oldlist []*MigFile, err error) {
 		return nil, nil, err
 	}
 	defer db.Close()
-	for _, v := range onurdered {
+	for _, v := range unordered {
 		tagFile(v, db)
 	}
-	//TODO: put on correct slice based on IsNew
-	//TODO: sort by v.Unix ASC
+	// put on correct slice based on IsNew
+	newlist = make([]*MigFile, 0)
+	oldlist = make([]*MigFile, 0)
+	for _, v := range unordered {
+		if v.IsNew {
+			newlist = append(newlist, v)
+		} else {
+			oldlist = append(oldlist, v)
+		}
+	}
+	// sort by v.Unix ASC
+	sort.SliceStable(newlist, func(i, j int) bool {
+		return newlist[i].Unix < newlist[j].Unix
+	})
+	sort.SliceStable(oldlist, func(i, j int) bool {
+		return oldlist[i].Unix < oldlist[j].Unix
+	})
 	return
 }
 
