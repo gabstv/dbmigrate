@@ -1,6 +1,9 @@
 package dbmigrate
 
 import (
+	"os/exec"
+	"context"
+	"io/ioutil"
 	"bufio"
 	"bytes"
 	"database/sql"
@@ -137,6 +140,50 @@ func ListMigrations(rootp string) (newlist, oldlist []*MigFile, err error) {
 		return oldlist[i].Unix < oldlist[j].Unix
 	})
 	return
+}
+
+func Apply(mf *MigFile, verbose bool) error {
+	if mf.Type == TypeGo {
+		return applyGo(mf)
+	}
+	if mf.Type == TypeSQL {
+		return applySQL(mf)
+	}
+	return fmt.Errorf("not configured migration type: %v", mf.Type)
+}
+
+func applyGo(mf *MigFile) error {
+	dirn, filen := filepath.Split(mf.Name)
+	cmdd := exec.Command("go", "run", filen)
+	cmdd.Dir = dirn
+	cmdlog, err := cmdd.CombinedOutput()
+	if
+}
+
+func applySQL(mf *MigFile) error {
+	db, err := mh.EnvConnect()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	sqlb, err := ioutil.ReadFile(mf.Name)
+	if err != nil {
+		return err
+	}
+	//TODO: check unsupported in postgres when implementing
+	tx, err := db.BeginTxx(context.Background(), &sql.TxOptions{
+		Isolation: sql.LevelSerializable,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(string(sqlb))
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	err = tx.Commit()
+	return err
 }
 
 func tagFile(mf *MigFile, db *sqlx.DB) error {
