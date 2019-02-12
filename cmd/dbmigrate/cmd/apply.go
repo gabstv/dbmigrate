@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gabstv/dbmigrate/pkg/dbmigrate"
-
 	"github.com/manifoldco/promptui"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -22,6 +21,11 @@ func init() {
 	//
 	applyCmd.Flags().StringVarP(&applyCmdDBName, "database", "d", "", "database to apply the migrations (default specified in the config file)")
 	applyCmd.Flags().BoolVarP(&applyCmdConfirm, "yes", "y", false, "if true, the apply command doesn't wait for confirmation")
+}
+
+var insertQDefaults = map[string]string{
+	"sqlite3": "INSERT INTO db_migrations (migration_id,author_name,created_at) VALUES (?,?,?);",
+	"mysql":   "INSERT INTO db_migrations (migration_id,author_name,created_at) VALUES (?,?,?);",
 }
 
 var applyCmd = &cobra.Command{
@@ -54,6 +58,13 @@ var applyCmd = &cobra.Command{
 		}
 		if err := os.Setenv("DBMSESS__DRIVER_NAME", drvname); err != nil {
 			return errors.Wrap(err, "set env DSN")
+		}
+		os.Unsetenv("DBMSESS__INSERT_QUERY")
+		os.Setenv("DBMSESS__INSERT_QUERY", insertQDefaults[drvname])
+		if viper.IsSet("migrations.insert_query") {
+			if v := viper.GetString("migrations.insert_query"); v != "" {
+				os.Setenv("DBMSESS__INSERT_QUERY", v)
+			}
 		}
 
 		rootp := viper.GetString("migrations.root")
@@ -136,16 +147,31 @@ var applyCmd = &cobra.Command{
 				os.Exit(2)
 			}
 		}
+		napplied := 0
 		for _, v := range newmigs {
-			fmt.Println("TODO: mig this", v.Name)
-			// TODO: run migration (go run for go files)
 			if verboseMode {
 				fmt.Println(time.Now().Format("2006-02-01 15:04:05"), "START:", v.Name)
 			}
+			os.Unsetenv("DBMSESS__UUID")
+			os.Unsetenv("DBMSESS__AUTHOR")
+			os.Unsetenv("DBMSESS__CREATED")
+			os.Setenv("DBMSESS__UUID", v.UUID)
+			os.Setenv("DBMSESS__AUTHOR", v.Author)
+			os.Setenv("DBMSESS__CREATED", v.T.Format("2006-02-01 15:04:05"))
 			if err := dbmigrate.Apply(v, verboseMode); err != nil {
 				fmt.Println(time.Now().Format("2006-02-01 15:04:05"), "FAILED:", v.Name)
 				fmt.Println(err.Error())
+				fmt.Printf("%v of %v migrations applied.\n", napplied, len(newmigs))
+				os.Exit(2)
+			}
+			napplied++
+			if verboseMode {
+				fmt.Println(time.Now().Format("2006-02-01 15:04:05"), "SUCCESS:", v.Name)
 			}
 		}
+		os.Unsetenv("DBMSESS__UUID")
+		os.Unsetenv("DBMSESS__AUTHOR")
+		os.Unsetenv("DBMSESS__CREATED")
+		fmt.Printf("%v of %v migrations applied.\n", napplied, len(newmigs))
 	},
 }

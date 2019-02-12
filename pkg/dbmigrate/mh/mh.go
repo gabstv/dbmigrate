@@ -10,13 +10,17 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
-	"github.com/mattn/go-sqlite3"
+	sqlite3 "github.com/mattn/go-sqlite3"
 )
 
 var drivers map[string]driver.Driver
 var driversMu sync.RWMutex
 
 func Run(fn func(tx Mtx)) {
+	//fmt.Println("RUN :: DN", os.Getenv("DBMSESS__DRIVER_NAME"))
+	//fmt.Println("RUN :: DSN", os.Getenv("DBMSESS__DATA_SOURCE_NAME"))
+	//wdir, _ := os.Getwd()
+	//fmt.Println("RUN :: WD", wdir)
 	xdb, err := EnvConnect()
 	if err != nil {
 		stderr(err, 1)
@@ -41,6 +45,12 @@ func Run(fn func(tx Mtx)) {
 		stdout(os.Getenv("DBMSESS__CURRENT_NAME"), "success... rolling back (TEST MODE)")
 		stderr(xtx.Rollback(), 1)
 		return
+	}
+
+	if _, err := xtx.Exec(os.Getenv("DBMSESS__INSERT_QUERY"), os.Getenv("DBMSESS__UUID"), os.Getenv("DBMSESS__AUTHOR"), os.Getenv("DBMSESS__CREATED")); err != nil {
+		stdout(os.Getenv("DBMSESS__CURRENT_NAME"), "insert migration ID error", err.Error())
+		stderr(xtx.Rollback(), 1)
+		os.Exit(1)
 	}
 
 	if err := xtx.Commit(); err != nil {

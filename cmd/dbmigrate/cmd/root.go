@@ -18,18 +18,24 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/gabstv/dbmigrate/internal/pkg/util"
+	"github.com/gabstv/dbmigrate/pkg/dbmigrate"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	// if you need to access the $HOME dir:
-	//homedir "github.com/mitchellh/go-homedir"
 )
 
 var cfgFile string
 var projectRoot string
 var migrationsRoot string
 var verboseMode bool
+
+//
+var configDir string
+
+//
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -70,22 +76,19 @@ func initConfig() {
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
+		p2, _ := filepath.Abs(cfgFile)
+		configDir, _ = filepath.Split(p2)
+		fmt.Println("path is", configDir)
 	} else {
-		// Find home directory.
-		/*home, err := homedir.Dir()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		// Search config in home directory with name ".dbmigrate" (without extension).
-		viper.AddConfigPath(home)
-		viper.SetConfigName(".dbmigrate")*/
 		if gitroot, err := util.GitRoot(); err == nil {
-			//if _, err := os.Stat(filepath.Join(gitroot, "dbmigrate.toml")); err == nil {
 			viper.AddConfigPath(gitroot)
 			viper.SetConfigName("dbmigrate")
-			//}
+			if !filepath.IsAbs(gitroot) {
+				p2, _ := filepath.Abs(gitroot)
+				configDir = p2
+			} else {
+				configDir = gitroot
+			}
 		}
 	}
 
@@ -93,27 +96,63 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		//fmt.Println("Using config file:", viper.ConfigFileUsed())
+		if verboseMode {
+			fmt.Println("Using config file:", viper.ConfigFileUsed())
+		}
 	} else {
-		//fmt.Println("not using config!", err.Error())
+		if verboseMode {
+			fmt.Println("not using config!", err.Error())
+		}
+	}
+	// parsepaths
+	if configDir != "" {
+		if viper.IsSet("migrations.root") {
+			viper.Set("migrations.root", rpath(configDir, viper.GetString("migrations.root")))
+		}
 	}
 }
 
+func rpath(base, v string) string {
+	if !strings.HasPrefix(v, "./") {
+		return v
+	}
+	return filepath.Join(base, v[1:])
+}
+
+func getcs(cs, cpath interface{}) string {
+	css := ""
+	cpaths := ""
+	if cs != nil {
+		css = cs.(string)
+	}
+	if cpath != nil {
+		cpaths = cpath.(string)
+	}
+	if css != "" {
+		return rpath(configDir, css)
+	}
+	if ff, err := ioutil.ReadFile(cpaths); err != nil {
+		fmt.Println("Could not read", cpaths, "->", err.Error())
+	} else {
+		css = string(ff)
+		return rpath(configDir, css)
+	}
+	return ""
+}
+
 func getDBFromConfig(name string) (connectionString string) {
-	if !viper.IsSet(fmt.Sprintf("databases.%v", name)) {
-		return
-	}
-	if v := viper.GetString(fmt.Sprintf("databases.%v.cs", name)); v != "" {
-		connectionString = v
-		return
-	}
-	if v := viper.GetString(fmt.Sprintf("databases.%v.file", name)); v != "" {
-		if ff, err := ioutil.ReadFile(v); err != nil {
-			fmt.Println("Could not read", v, "->", err.Error())
-		} else {
-			connectionString = string(ff)
-			return
+	dbs := make([]dbmigrate.Database, 0)
+	if err := viper.UnmarshalKey("databases", &dbs); err == nil {
+		for _, v := range dbs {
+			if v.Name == name {
+				return getcs(v.CS, v.File)
+			}
 		}
+	} else {
+		fmt.Println("ERR", err.Error())
+	}
+	if verboseMode {
+		fmt.Printf("databases.%v not set\n", name)
 	}
 	return
 }

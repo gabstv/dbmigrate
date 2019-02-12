@@ -10,8 +10,8 @@ type Config struct {
 
 // Migrations path and new file config
 type Migrations struct {
-	Root        string   `toml:"root"`
-	DefaultType FileType `toml:"default_type"`
+	Root        string   `toml:"root" mapstructure:"root"`
+	DefaultType FileType `toml:"default_type" mapstructure:"default_type"`
 }
 
 // Database to apply migrations.
@@ -20,7 +20,7 @@ type Migrations struct {
 // set a file. The file option will read the specified
 // file and use it as the Connection String.
 type Database struct {
-	Name string `toml:"name"`
-	CS   string `toml:"cs"`
-	File string `toml:"file"`
+	Name string `toml:"name" mapstructure:"name"`
+	CS   string `toml:"cs" mapstructure:"cs"`
+	File string `toml:"file" mapstructure:"file"`
 }
