@@ -2,11 +2,16 @@ package cmd
 
 import (
 	"fmt"
+	"os/user"
+	"time"
+
+	"github.com/spf13/viper"
 
 	"github.com/spf13/cobra"
 )
 
 var newCmdFileType string
+var newCmdMigrationName string
 
 func init() {
 	rootCmd.AddCommand(newCmd)
@@ -24,10 +29,25 @@ executed inside a single transaction. You may want to split bigger files
 to lighten the load.`,
 	Example: "new -t go migration_subject",
 	Args:    cobra.RangeArgs(0, 1),
-	Run: func(cmd *cobra.Command, args []string) {
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		if newCmdFileType == "" {
+			newCmdFileType = viper.GetString("migrations.default_type")
+		}
 		if newCmdFileType == "" {
 			newCmdFileType = "sql"
 		}
+		if u, err := user.Current(); u != nil {
+			if len(args) > 0 {
+				newCmdMigrationName = time.Now().Format("2006_01_02T150405_") + u.Username + "_" + args[0]
+			} else {
+				newCmdMigrationName = time.Now().Format("2006_01_02T150405_") + u.Username
+			}
+		} else if err != nil {
+			return err
+		}
+		return nil
+	},
+	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("new migration file type:", newCmdFileType)
 		fmt.Println("TODO: create migration file")
 		// step 1 - get the path to the migrations folder
