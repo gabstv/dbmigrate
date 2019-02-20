@@ -2,7 +2,10 @@ package dbmigrate
 
 import (
 	"bytes"
-	"fmt"
+	"io"
+	"os"
+	"os/user"
+	"path/filepath"
 	"text/template"
 	"time"
 
@@ -50,20 +53,46 @@ var templateSQL = `-- DO NOT REMOVE THE COMMENTS BELOW
 func New(name string, ftype FileType, migrationsRoot string) (string, error) {
 	id := uuid.New()
 	var tf string
+	var ext string
 	switch ftype {
 	case TypeGo:
 		tf = templateGo
+		ext = ".go"
 	case TypeSQL:
 		tf = templateSQL
+		ext = ".sql"
 	}
 	tpl, err := template.New("new_migration").Parse(tf)
 	if err != nil {
 		return "", err
 	}
+	username := "agent"
+	if usr, _ := user.Current(); usr != nil {
+		username = usr.Username
+	}
 	buf := new(bytes.Buffer)
-	tpl.Execute(buf, map[string]interface{}{
-		"UUID": id.String(),
-		"DATE": time.Now().Format("2006-01-02 15:04:05"),
-	})
-	return id.String(), fmt.Errorf("TODO: this function")
+	if err := tpl.Execute(buf, map[string]interface{}{
+		"UUID":   id.String(),
+		"DATE":   time.Now().Format("2006-01-02 15:04:05"),
+		"AUTHOR": username,
+	}); err != nil {
+		return "", err
+	}
+	wholename := name + ext
+	if cdir, _ := filepath.Split(wholename); cdir != "" {
+		if _, err := os.Stat(cdir); err != nil {
+			if err := os.MkdirAll(cdir, 0744); err != nil {
+				return "", err
+			}
+		}
+	}
+	newf, err := os.Create(wholename)
+	if err != nil {
+		return "", err
+	}
+	defer newf.Close()
+	if _, err := io.Copy(newf, buf); err != nil {
+		return "", err
+	}
+	return wholename, nil
 }
