@@ -57,7 +57,7 @@ func New(name string, ftype FileType, migrationsRoot string) (string, error) {
 	switch ftype {
 	case TypeGo:
 		tf = templateGo
-		ext = ".go"
+		ext = "/main.go"
 	case TypeSQL:
 		tf = templateSQL
 		ext = ".sql"
