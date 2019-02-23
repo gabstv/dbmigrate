@@ -51,6 +51,7 @@ var templateSQL = `-- DO NOT REMOVE THE COMMENTS BELOW
 
 // New migration file
 func New(name string, ftype FileType, migrationsRoot string) (string, error) {
+	t00 := time.Now()
 	id := uuid.New()
 	var tf string
 	var ext string
@@ -73,12 +74,12 @@ func New(name string, ftype FileType, migrationsRoot string) (string, error) {
 	buf := new(bytes.Buffer)
 	if err := tpl.Execute(buf, map[string]interface{}{
 		"UUID":   id.String(),
-		"DATE":   time.Now().Format("2006-01-02 15:04:05"),
+		"DATE":   t00.Format("2006-01-02 15:04:05"),
 		"AUTHOR": username,
 	}); err != nil {
 		return "", err
 	}
-	wholename := name + ext
+	wholename := filepath.Join(migrationsRoot, t00.Format("2006"), t00.Format("2006_01"), t00.Format("2006_01_02"), t00.Format("20060102150405_")+username+"_"+name+ext)
 	if cdir, _ := filepath.Split(wholename); cdir != "" {
 		if _, err := os.Stat(cdir); err != nil {
 			if err := os.MkdirAll(cdir, 0744); err != nil {
