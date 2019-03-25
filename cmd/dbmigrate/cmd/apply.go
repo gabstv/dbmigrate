@@ -67,22 +67,9 @@ var applyCmd = &cobra.Command{
 			}
 		}
 
-		rootp := viper.GetString("migrations.root")
-		if rootp == "" && !applyCmdConfirm {
-			fmt.Println("The migrations root path is empty. The current directory will be used:")
-			wdd, _ := os.Getwd()
-			fmt.Println(wdd)
-			prompt := promptui.Prompt{
-				IsConfirm: true,
-				Label:     "Continue",
-			}
-			result, err := prompt.Run()
-			if err != nil {
-				return errors.Wrap(err, "get prompt 1")
-			}
-			if result == "n" {
-				return fmt.Errorf("aborted")
-			}
+		rootp, err := getMigrationsRootPath()
+		if err != nil {
+			return err
 		}
 		applyCmdRootPath = rootp
 		return nil
